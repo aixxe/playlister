@@ -66,16 +66,16 @@ namespace playlister
     music_entry_t* last_music_entry_ptr = nullptr;
 
     // hooks
-    auto music_select_init_hook = SafetyInlineHook {};
-    auto open_category_hook = SafetyMidHook {};
-    auto close_category_hook = SafetyMidHook {};
-    auto draw_bar_text_outer_hook = SafetyInlineHook {};
-    auto draw_bar_text_inner_hook = SafetyInlineHook {};
-    auto folder_open_voice_hook = SafetyMidHook {};
-    auto folder_set_ticker_hook = SafetyMidHook {};
-    auto setup_categories_hook = SafetyInlineHook {};
-    auto save_category_hook = SafetyInlineHook {};
-    auto cursor_lock_hook = SafetyInlineHook {};
+    auto music_select_init_hook = safetyhook::InlineHook {};
+    auto open_category_hook = safetyhook::MidHook {};
+    auto close_category_hook = safetyhook::MidHook {};
+    auto draw_bar_text_outer_hook = safetyhook::InlineHook {};
+    auto draw_bar_text_inner_hook = safetyhook::InlineHook {};
+    auto folder_open_voice_hook = safetyhook::MidHook {};
+    auto folder_set_ticker_hook = safetyhook::MidHook {};
+    auto setup_categories_hook = safetyhook::InlineHook {};
+    auto save_category_hook = safetyhook::InlineHook {};
+    auto cursor_lock_hook = safetyhook::InlineHook {};
 
     // utility
     auto is_valid_game_type()
@@ -479,18 +479,14 @@ namespace playlister
         playlist_mode_patches.emplace_back(base + RANDOM_SPLIT_LAMP_PATCH, 0xE9, 0x33, 0x02, 0x00, 0x00, 0x90);
         playlist_mode_patches.emplace_back(base + TOURISM_CRASH_FIX_PATCH, 0xE9, 0x97, 0x00, 0x00, 0x00, 0x90);
 
-        // start installing hooks
-        auto factory = SafetyHookFactory::init();
-        auto builder = factory->acquire();
-
         //
         // called in various places but never while inside music select
         // useful place to reset things that will be set in future hooks
         //
-        music_select_init_hook = builder.create_inline(base + MSELECT_INIT_HOOK, +[]
+        music_select_init_hook = safetyhook::create_inline(base + MSELECT_INIT_HOOK, +[]
         {
             // call the original
-            mselect = music_select_init_hook->call<CMusicSelectScene*>();
+            mselect = music_select_init_hook.call<CMusicSelectScene*>();
 
             if (target_category_id != -1)
                 spdlog::debug("Resetting music select state...");
@@ -508,7 +504,7 @@ namespace playlister
         //
         // called when opening a category
         //
-        open_category_hook = builder.create_mid(base + OPEN_CATEGORY_HOOK,
+        open_category_hook = safetyhook::create_mid(base + OPEN_CATEGORY_HOOK,
             [] (SafetyHookContext& ctx)
         {
             // if we're already in playlist mode, don't do anything
@@ -547,7 +543,7 @@ namespace playlister
         //
         // opens the sort menu when pressing black keys, used to exit playlist mode
         //
-        close_category_hook = builder.create_mid(base + CLOSE_CATEGORY_HOOK,
+        close_category_hook = safetyhook::create_mid(base + CLOSE_CATEGORY_HOOK,
             [] (SafetyHookContext& ctx)
         {
             // check if we're in playlist mode
@@ -608,20 +604,20 @@ namespace playlister
         //
         // gathers context for the next hook
         //
-        draw_bar_text_outer_hook = builder.create_inline(base + DRAW_BAR_TEXT_HOOK_A,
+        draw_bar_text_outer_hook = safetyhook::create_inline(base + DRAW_BAR_TEXT_HOOK_A,
            +[] (std::int32_t* category_id, int a2, int a3, float a4, unsigned int a5)
         {
             // just store the category to use in inner hook
             text_category_id = *category_id;
 
             // call original function
-            return draw_bar_text_outer_hook->call<std::int32_t*, void*, int, int, float, unsigned int>(category_id, a2, a3, a4, a5);
+            return draw_bar_text_outer_hook.call<std::int32_t*, void*, int, int, float, unsigned int>(category_id, a2, a3, a4, a5);
         });
 
         //
         // overrides folder name text rendering
         //
-        draw_bar_text_inner_hook = builder.create_inline(base + DRAW_BAR_TEXT_HOOK_B,
+        draw_bar_text_inner_hook = safetyhook::create_inline(base + DRAW_BAR_TEXT_HOOK_B,
            +[] (int font, int x, int y, int flags, void* buffer, const char* text, float width)
         {
             if (in_playlist_mode || !is_valid_game_type())
@@ -647,13 +643,13 @@ namespace playlister
             }
 
             // call the original to render it
-            return draw_bar_text_inner_hook->call(font, x, y, flags, buffer, text, width);
+            return draw_bar_text_inner_hook.call(font, x, y, flags, buffer, text, width);
         });
 
         //
         // resolves category id -> system sound id
         //
-        folder_open_voice_hook = builder.create_mid(base + FOLDER_VOICE_OPEN_HOOK,
+        folder_open_voice_hook = safetyhook::create_mid(base + FOLDER_VOICE_OPEN_HOOK,
             [] (SafetyHookContext& ctx)
         {
             if (!in_playlist_mode || !is_valid_game_type())
@@ -677,7 +673,7 @@ namespace playlister
         //
         // updates the ticker text
         //
-        folder_set_ticker_hook = builder.create_mid(base + FOLDER_TICKER_TEXT_HOOK,
+        folder_set_ticker_hook = safetyhook::create_mid(base + FOLDER_TICKER_TEXT_HOOK,
             [] (SafetyHookContext& ctx)
         {
             if (!in_playlist_mode || !is_valid_game_type())
@@ -697,23 +693,23 @@ namespace playlister
         //
         // called when populating the category list
         //
-        setup_categories_hook = builder.create_inline(base + SETUP_CATEGORIES_HOOK,
+        setup_categories_hook = safetyhook::create_inline(base + SETUP_CATEGORIES_HOOK,
             +[] (CCategoryGameData* a1, int a2) -> std::int64_t
         {
             if (!is_valid_game_type()) // only run in "safe" game modes to prevent crashes
-                return setup_categories_hook->call<std::int64_t, CCategoryGameData*, int>(a1, a2);
+                return setup_categories_hook.call<std::int64_t, CCategoryGameData*, int>(a1, a2);
 
             // run for the opposite style first, so we can take a backup
             if (!backup_created)
             {
                 spdlog::debug("Setting up categories for {}...", state->play_style == STYLE_SP ? "DP": "SP");
                 state->play_style = (state->play_style == STYLE_SP ? STYLE_DP: STYLE_SP);
-                setup_categories_hook->call(a1, a2);
+                setup_categories_hook.call(a1, a2);
                 state->play_style = (state->play_style == STYLE_SP ? STYLE_DP: STYLE_SP);
             }
 
             // call the original for the current play style to set up the "known good" categories
-            auto result = setup_categories_hook->call<std::int64_t, CCategoryGameData*, int>(a1, a2);
+            auto result = setup_categories_hook.call<std::int64_t, CCategoryGameData*, int>(a1, a2);
 
             // find an unused category we can hijack. if there isn't one, we can't do anything
             // todo: probably set some disable flag and ensure every hook respects it if this happens
@@ -830,7 +826,7 @@ namespace playlister
         //
         // called when leaving music select
         //
-        save_category_hook = builder.create_inline(base + SAVE_CATEGORY_HOOK,
+        save_category_hook = safetyhook::create_inline(base + SAVE_CATEGORY_HOOK,
             +[] (void* a1, int a2)
         {
             last_category_id = -1;
@@ -839,7 +835,7 @@ namespace playlister
             last_music_entry_ptr = nullptr;
 
             if (!in_playlist_mode || !is_valid_game_type())
-                return save_category_hook->call<void*, void*, int>(a1, a2);
+                return save_category_hook.call<void*, void*, int>(a1, a2);
 
             for (auto i = 0; i < CATEGORY_COUNT; ++i)
             {
@@ -870,12 +866,12 @@ namespace playlister
         // workaround for game opening the wrong category (because the ids are all the same)
         // todo: see how this works with/without cursor lock hex edit
         //
-        cursor_lock_hook = builder.create_inline(base + CURSOR_LOCK_HOOK,
+        cursor_lock_hook = safetyhook::create_inline(base + CURSOR_LOCK_HOOK,
             +[] (bar_state_t* bar_state, int a2, int a3, int a4, int a5, char a6, int a7)
         {
             // let the game handle it if we're not in playlist mode
             if (!in_playlist_mode || last_category_id == -1 || !is_valid_game_type())
-                return cursor_lock_hook->call<void*, bar_state_t*, int, int, int, int, char, int>(bar_state, a2, a3, a4, a5, a6, a7);
+                return cursor_lock_hook.call<void*, bar_state_t*, int, int, int, int, char, int>(bar_state, a2, a3, a4, a5, a6, a7);
 
             // setup categories has already been called, so every category should already be closed
             spdlog::debug("Searching for category ID #{}...", last_category_id);
@@ -941,9 +937,6 @@ auto get_dll_path(HMODULE library)
 auto unload()
 {
     spdlog::debug("Removing installed hooks...");
-
-    auto factory = SafetyHookFactory::init();
-    auto builder = factory->acquire();
 
     if (playlister::in_playlist_mode)
         playlister::exit_playlist_mode();

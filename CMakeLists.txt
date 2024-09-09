@@ -17,15 +17,10 @@ CPMAddPackage(
 )
 
 CPMAddPackage(
-    NAME              bddisasm
-    GIT_TAG           61382e95f0029a51bbde12c6bd98c65a419b3abf
-    GITHUB_REPOSITORY bitdefender/bddisasm
-)
-
-CPMAddPackage(
-    NAME              safetyhook
-    GIT_TAG           25629ca8320a7fe3df5ea37f1c07c1291d43a0d6
-    GITHUB_REPOSITORY cursey/safetyhook
+    NAME               safetyhook
+    GIT_TAG            v0.4.1
+    GITHUB_REPOSITORY  cursey/safetyhook
+    OPTIONS            "SAFETYHOOK_FETCH_ZYDIS ON"
 )
 
 CPMAddPackage(
