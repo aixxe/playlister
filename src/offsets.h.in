@@ -1,0 +1,71 @@
+#pragma once
+
+struct offsets
+{
+	std::string GAME_VERSION;
+
+	std::uintptr_t DLL_CODE_SIZE;
+	std::uintptr_t DLL_ENTRYPOINT;
+	std::uintptr_t DLL_IMAGE_SIZE;
+
+	std::uint8_t* PLAY_SOUND_FN;
+    std::uint8_t* RELOAD_LAMPS_FN;
+    std::uint8_t* SORT_BARS_FN;
+    std::uint8_t* GET_APP_CFG_FN;
+    std::uint8_t* CATEGORY_DEFS;
+
+    std::uint8_t* DRAW_BAR_TEXT_HOOK_B;
+    std::uint8_t* DRAW_BAR_TEXT_HOOK_A;
+    std::uint8_t* FOLDER_VOICE_OPEN_HOOK;
+    std::uint8_t* OPEN_CATEGORY_HOOK;
+    std::uint8_t* CLOSE_CATEGORY_HOOK;
+    std::uint8_t* FOLDER_TICKER_TEXT_HOOK;
+    std::uint8_t* CURSOR_LOCK_HOOK;
+    std::uint8_t* SETUP_CATEGORIES_HOOK;
+    std::uint8_t* SAVE_CATEGORY_HOOK;
+    std::uint8_t* MSELECT_EV2_INIT_HOOK;
+    std::uint8_t* MSELECT_INIT_HOOK;
+    std::uint8_t* RESET_STATE_HOOK;
+
+    std::uint8_t* BAR_CUSTOM_TEXT_PATCH;
+    std::uint8_t* BAR_CONTEST_TEXT_PATCH;
+    std::uint8_t* BAR_TOURISM_BADGE_PATCH;
+    std::uint8_t* BAR_CONTEST_LAMP_PATCH;
+    std::uint8_t* BAR_BATTLE_LAMP_PATCH;
+    std::uint8_t* RANDOM_SPLIT_LAMP_PATCH;
+
+    std::uint8_t* SCORES_P1;
+    std::uint8_t* SCORES_P2;
+    std::uint8_t* CATEGORY_DATA;
+    std::uint8_t* MSELECT_DATA;
+    std::uint8_t* GAME_STATE;
+    std::uint8_t* MUSIC_DATA;
+    std::uint8_t* BUTTON_STATE;
+};
+
+auto inline resolve_offsets(std::uint8_t* base) -> std::optional<offsets>
+{
+	auto versions = std::vector<offsets> {};
+
+    // populated at build-time from src/offsets/*.cc
+	@ALL_OFFSETS@
+
+	auto const dos = reinterpret_cast<IMAGE_DOS_HEADER*>(base);
+	auto const nt = reinterpret_cast<IMAGE_NT_HEADERS*>(base + dos->e_lfanew);
+
+	for (auto&& version: versions)
+	{
+		if (nt->OptionalHeader.SizeOfCode != version.DLL_CODE_SIZE)
+			continue;
+
+		if (nt->OptionalHeader.AddressOfEntryPoint != version.DLL_ENTRYPOINT)
+			continue;
+
+		if (nt->OptionalHeader.SizeOfImage != version.DLL_IMAGE_SIZE)
+			continue;
+
+		return version;
+	}
+
+	return std::nullopt;
+}

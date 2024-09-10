@@ -1,49 +1,18 @@
 #pragma once
 
-// offsets for LDJ-003-2023090500
-#define OFFSET_GAME_STATE	    0x6D6C0E0
-#define OFFSET_BUTTON_STATE     0x722EEEC
-#define OFFSET_MUSIC_DATA       0x6D6D070
-#define OFFSET_SCORES_P1        0x2FA17A4
-#define OFFSET_SCORES_P2        0x4BE62DC
-#define OFFSET_CATEGORY_DEFS    0x6B65B00
-#define OFFSET_GET_APP_CFG_FN   0xAC8AB0
-#define OFFSET_CATEGORY_DATA    0x6B84A80
-#define OFFSET_MSELECT_DATA     0x6B84A98
-#define OFFSET_RELOAD_LAMPS_FN  0x5590B0
-#define OFFSET_SORT_BARS_FN     0x90B240
-#define OFFSET_PLAY_SOUND_FN    0x4C5680
-
-#define MSELECT_INIT_HOOK       0xB366C0
-#define OPEN_CATEGORY_HOOK      0x559355
-#define CLOSE_CATEGORY_HOOK     0x559979
-#define DRAW_BAR_TEXT_HOOK_A    0x541E60
-#define DRAW_BAR_TEXT_HOOK_B    0x532670
-#define FOLDER_VOICE_OPEN_HOOK  0x54ED29
-#define FOLDER_TICKER_TEXT_HOOK 0x55A48E
-#define SETUP_CATEGORIES_HOOK   0x907650
-#define SAVE_CATEGORY_HOOK      0x975090
-#define CURSOR_LOCK_HOOK        0x55A8A0
-
-#define BAR_EVENT_BADGE_PATCH   0x5427C9
-#define BAR_CONTEST_TEXT_PATCH  0x542359
-#define BAR_CUSTOM_TEXT_PATCH   0x541F8C
-#define BAR_EVENT_LAMP_PATCH    0x542A44
-#define BAR_CONTEST_LAMP_PATCH  0x542A91
-#define BAR_BATTLE_LAMP_PATCH   0x542CA2
-#define RANDOM_SPLIT_LAMP_PATCH 0x54CF64
-#define TOURISM_CRASH_FIX_PATCH 0x54E375
+#include <windows.h>
+#include <offsets.h>
 
 // category id to replace
-#define OVERRIDE_CATEGORY_ID    171
+#define OVERRIDE_CATEGORY_ID    191
 
 // bar texture to use for custom playlists
 #define DEFAULT_BAR_TEXTURE     "so_b_playlist"
 
-#define FOLDER_OPEN_SOUND_ID    0x2C80
+#define FOLDER_OPEN_SOUND_ID    0x30E0
 
-#define CATEGORY_COUNT          193
-#define BAR_COUNT               9000
+#define CATEGORY_COUNT          218
+#define BAR_COUNT               7801
 
 #define PLAYER_1                0
 #define PLAYER_2                1
@@ -53,7 +22,7 @@
 #define STYLE_DP                1
 #define STYLE_COUNT             2
 
-#define MAX_ENTRIES             31000
+#define MAX_ENTRIES             32000
 
 #define DIFFICULTY_BEGINNER     0
 #define DIFFICULTY_NORMAL       1
@@ -81,39 +50,39 @@
 // categories that are okay to override on the main song select list
 // we don't want playlists in step up mode, so all of these are from there
 auto static constexpr good_ids = {
-    135, // so_setpiece
-    136, // so_setpiece_ura
-    137, // ss_stup_dif1
-    138, // ss_stup_dif2
-    139, // ss_stup_dif3
-    140, // ss_stup_dif4
-    141, // ss_stup_dif5
-    142, // ss_stup_dif6
-    143, // ss_stup_dif7
-    144, // ss_stup_dif8
-    145, // ss_stup_dif9
-    146, // ss_stup_dif10
-    147, // ss_stup_dif11
-    148, // ss_stup_dif12
-    149, // so_class_mogi_7kyu
-    150, // so_class_mogi_6kyu
-    151, // so_class_mogi_5kyu
-    152, // so_class_mogi_4kyu
-    153, // so_class_mogi_3kyu
-    154, // so_class_mogi_2kyu
-    155, // so_class_mogi_1kyu
-    156, // so_class_mogi_syodan
-    157, // so_class_mogi_2dan
-    158, // so_class_mogi_3dan
-    159, // so_class_mogi_4dan
-    160, // so_class_mogi_5dan
-    161, // so_class_mogi_6dan
-    162, // so_class_mogi_7dan
-    163, // so_class_mogi_8dan
-    164, // so_class_mogi_9dan
-    165, // so_class_mogi_10dan
-    166, // so_class_mogi_11dan
-    167, // so_class_mogi_12dan
+    155, // so_setpiece
+    156, // so_setpiece_ura
+    157, // ss_stup_dif1
+    158, // ss_stup_dif2
+    159, // ss_stup_dif3
+    160, // ss_stup_dif4
+    161, // ss_stup_dif5
+    162, // ss_stup_dif6
+    163, // ss_stup_dif7
+    164, // ss_stup_dif8
+    165, // ss_stup_dif9
+    166, // ss_stup_dif10
+    167, // ss_stup_dif11
+    168, // ss_stup_dif12
+    169, // so_class_mogi_7kyu
+    170, // so_class_mogi_6kyu
+    171, // so_class_mogi_5kyu
+    172, // so_class_mogi_4kyu
+    173, // so_class_mogi_3kyu
+    174, // so_class_mogi_2kyu
+    175, // so_class_mogi_1kyu
+    176, // so_class_mogi_syodan
+    177, // so_class_mogi_2dan
+    178, // so_class_mogi_3dan
+    179, // so_class_mogi_4dan
+    180, // so_class_mogi_5dan
+    181, // so_class_mogi_6dan
+    182, // so_class_mogi_7dan
+    183, // so_class_mogi_8dan
+    184, // so_class_mogi_9dan
+    185, // so_class_mogi_10dan
+    186, // so_class_mogi_11dan
+    187, // so_class_mogi_12dan
 };
 
 struct bar_state_t
@@ -142,7 +111,7 @@ struct category_definitions_t
 {
     std::uint8_t pad_0000[8]; //0x0000
     category_definition_t categories[CATEGORY_COUNT]; //0x0008
-}; static_assert(sizeof(category_definitions_t) == 0x3048);
+}; static_assert(sizeof(category_definitions_t) == 0x3688);
 
 struct notes_radar_t
 {
@@ -185,13 +154,13 @@ struct music_entry_t
 
 struct music_data_t
 {
-    std::uint8_t header[4]; //0x0000
+    std::uint8_t header[4]; //0x0000 "IIDX"
     std::uint32_t game_version; //0x0004
     std::uint16_t occupied_entries; //0x0008
     std::uint16_t maximum_entries; //0x000A
-    std::uint8_t pad_000C[62004]; //0x000C
-    music_entry_t first; //0xF240
-}; static_assert(sizeof(music_data_t) == 0xF76C);
+    std::uint8_t pad_000C[64004]; //0x000C
+    music_entry_t first; //0xFA10
+}; static_assert(sizeof(music_data_t) == 0xFF3C);
 
 struct category_bar_t
 {
@@ -213,6 +182,16 @@ struct category_bar_list_t
     category_bar_t* bar; //0x0008
 }; static_assert(sizeof(category_bar_list_t) == 0x10);
 
+struct category_meta_t
+{
+    std::int32_t id; //0x0000
+    std::uint8_t pad_0004[12]; //0x0004
+    void* userdata; //0x0010
+    std::uint8_t pad_0018[24]; //0x0018
+    std::int32_t id2; //0x0030
+    std::uint8_t pad_0034[12]; //0x0034
+}; static_assert(sizeof(category_meta_t) == 0x40);
+
 struct category_t
 {
 	std::int32_t id; //0x0000
@@ -224,14 +203,9 @@ struct category_t
 	std::int32_t selected_difficulty; //0x0018
     std::uint8_t pad_001C[20]; //0x001C
 	category_bar_list_t bars[BAR_COUNT + 1]; //0x0030
-	std::int32_t bar_type; //0x232C0
-    std::uint8_t pad_232C4[12]; //0x232C4
-    void* userdata; //0x232D0 [Not really, but it SEEMS safe to overwrite.]
-	char pad_232D8[24]; //0x232D8
-	std::int32_t id2; //0x232F0
-    std::uint8_t pad_232F4[12]; //0x232F4
-	category_bar_t entries[BAR_COUNT]; //0x23300
-}; static_assert(sizeof(category_t) == 0xAFD00);
+    category_meta_t meta; //0x1E7D0
+    category_bar_t entries[BAR_COUNT]; //0x1E810
+}; static_assert(sizeof(category_t) == 0x98650);
 
 struct category_bar_meta_t
 {
@@ -258,11 +232,11 @@ struct CCategoryGameData
 {
     std::uint8_t pad_0000[16]; //0x0000
     category_t categories[2][CATEGORY_COUNT]; //0x0010
-    category_t* populated_categories[2][CATEGORY_COUNT]; //0x10399210
-	std::int32_t bar_count; //0x10399DE0 for current play style
-    category_bar_meta_t bar_meta[2][CATEGORY_COUNT]; //0x10399DE4
-    std::uint8_t pad_103A95F4[4]; //0x103A95F4
-}; static_assert(sizeof(CCategoryGameData) == 0x10928378);
+    category_t* populated_categories[2][CATEGORY_COUNT]; //0x1038C050
+	std::int32_t bar_count; //0x1038CDF0 for current play style
+    category_bar_meta_t bar_meta[2][CATEGORY_COUNT]; //0x1038CDF4
+    std::uint8_t pad_1039EC14[4]; //0x1039EC14
+}; static_assert(sizeof(CCategoryGameData) == 0x1039EC18);
 
 struct CMusicSelectGameData
 {
@@ -274,18 +248,21 @@ struct CMusicSelectGameData
 
 struct CMusicSelectScene
 {
-    std::uint8_t pad_0000[1120]; //0x0000
-	bar_state_t bar_state; //0x0460
-}; static_assert(sizeof(CMusicSelectScene) == 0x470);
+    std::uint8_t pad_0000[1184]; //0x0000
+	bar_state_t bar_state; //0x04A0
+}; static_assert(sizeof(CMusicSelectScene) == 0x4B0);
+
+struct CEvent2MusicSelectScene
+{
+    std::uint8_t pad_0000[1168]; //0x0000
+	bar_state_t bar_state; //0x0490
+}; static_assert(sizeof(CEvent2MusicSelectScene) == 0x4A0);
 
 struct CApplicationConfig
 {
-    std::uint8_t pad_0000[12]; //0x0000
-    std::int32_t cabinet_mode; //0x000C
-    std::int32_t target_fps; //0x0010
-    std::uint8_t pad_0014[4]; //0x0014
-	std::float_t monitor_check_fps; //0x0018
-}; static_assert(sizeof(CApplicationConfig) == 0x1C);
+    std::uint8_t pad_0000[28]; //0x0000
+    std::float_t monitor_check_fps; //0x001C
+}; static_assert(sizeof(CApplicationConfig) == 0x20);
 
 struct state_t
 {
@@ -309,4 +286,4 @@ struct score_t
 struct player_scores_t
 {
     score_t scores[PLAYER_COUNT][MAX_ENTRIES]; //0x0000
-}; static_assert(sizeof(player_scores_t) == 0x2D6900);
+}; static_assert(sizeof(player_scores_t) == 0x2EE000);

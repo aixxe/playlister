@@ -1,11 +1,11 @@
 ![In-game screenshot showing various custom categories](assets/images/screenshot.jpg)
 ## playlister<sub>3</sub>
 
-Re-introduces the playlist functionality to beatmania IIDX 30 RESIDENT with various usability improvements
+Re-introduces the playlist functionality to beatmania IIDX 31 EPOLIS with various usability improvements
 
 ### Compatibility
 
-Offsets are specific to the LDJ-003-2023090500 game version
+Offsets are specific to the LDJ-2024082600 game version
 
 ### Usage
 

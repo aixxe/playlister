@@ -31,6 +31,7 @@ auto category_definition_patches = std::unordered_map<decltype(category_t::id), 
 namespace playlister
 {
     // game context
+    offsets addr;
     util::library base;
     state_t* state = nullptr;
     std::uint64_t* buttons = nullptr;
@@ -58,7 +59,7 @@ namespace playlister
     category_bar_meta_t bar_meta_backup[2][CATEGORY_COUNT];
 
     // various temporary state
-    CMusicSelectScene* mselect = nullptr;
+    bar_state_t* bar_state = nullptr;
     auto text_category_id = -1;
     auto last_category_id = -1;
     auto last_music_difficulty_p1 = -1;
@@ -67,6 +68,7 @@ namespace playlister
 
     // hooks
     auto music_select_init_hook = safetyhook::InlineHook {};
+    auto music_select_event2_init_hook = safetyhook::InlineHook {};
     auto open_category_hook = safetyhook::MidHook {};
     auto close_category_hook = safetyhook::MidHook {};
     auto draw_bar_text_outer_hook = safetyhook::InlineHook {};
@@ -76,6 +78,7 @@ namespace playlister
     auto setup_categories_hook = safetyhook::InlineHook {};
     auto save_category_hook = safetyhook::InlineHook {};
     auto cursor_lock_hook = safetyhook::InlineHook {};
+    auto reset_state_hook = safetyhook::InlineHook {};
 
     // utility
     auto is_valid_game_type()
@@ -89,7 +92,8 @@ namespace playlister
             return false;
 
         // probably fine in all other modes
-        return true;
+        // also require bar_state to be set, since it's used everywhere
+        return bar_state != nullptr;
     }
 
     auto find_unused_category(CCategoryGameData* data)
@@ -185,6 +189,7 @@ namespace playlister
 			category->entries[0].p1_difficulty_original = difficulty;
 			category->entries[0].p2_difficulty = difficulty;
 			category->entries[0].p2_difficulty_original = difficulty;
+            category->entries[0].category_id = category->meta.id;
             for (auto& style: category->entries[0].bar_style)
                 style = bar_style;
 
@@ -202,12 +207,13 @@ namespace playlister
 			category->entries[1].p1_difficulty_original = difficulty;
 			category->entries[1].p2_difficulty = difficulty;
 			category->entries[1].p2_difficulty_original = difficulty;
+            category->entries[1].category_id = category->meta.id;
             for (auto& style: category->entries[1].bar_style)
                 style = bar_style;
 
 			// add the RANDOM SELECT bar
             category->bars[0].type = 2;
-            category->bars[0].bar = reinterpret_cast<category_bar_t*>(&category->id2);
+            category->bars[0].bar = reinterpret_cast<category_bar_t*>(&category->meta.id2);
 
 			// we just overwrote the bar for the first song, so add it again
 			category->bars[1].type = 1;
@@ -231,6 +237,7 @@ namespace playlister
 			category->entries[music_index].p1_difficulty_original = difficulty;
 			category->entries[music_index].p2_difficulty = difficulty;
 			category->entries[music_index].p2_difficulty_original = difficulty;
+            category->entries[music_index].category_id = category->meta.id;
             for (auto& style: category->entries[music_index].bar_style)
                 style = bar_style;
 
@@ -239,6 +246,7 @@ namespace playlister
 
 			category->bar_count++;
 			category->song_count++;
+            category->song_count_flag++;
         }
     }
 
@@ -275,7 +283,7 @@ namespace playlister
         std::uint8_t lowest_clear[PLAYER_COUNT] = { CLEAR_FULL_COMBO, CLEAR_FULL_COMBO };
 
         spdlog::debug("Calculating clear lamps for category {}...",
-            category_definitions->categories[category->bar_type].bar_bg_texture_name);
+            category_definitions->categories[category->meta.id].bar_bg_texture_name);
 
         for (auto entry: category->entries)
         {
@@ -320,7 +328,7 @@ namespace playlister
         bar_meta->p2_leggendaria_clear_lamp = lowest_clear[1];
 
         spdlog::debug("Clear lamp for category {} = P1:{}, P2:{}",
-            category_definitions->categories[category->bar_type].bar_bg_texture_name,
+            category_definitions->categories[category->meta.id].bar_bg_texture_name,
             lowest_clear[0], lowest_clear[1]);
     }
 
@@ -349,10 +357,10 @@ namespace playlister
         category_game_data->categories[style][id].id = OVERRIDE_CATEGORY_ID;
 
         // set a reference back to the playlist in a (hopefully) unused field
-        category_game_data->categories[style][id].userdata = (void*) &playlist;
+        category_game_data->categories[style][id].meta.userdata = (void*) &playlist;
 
         // make it appear as something else by setting the bar type
-        category_game_data->categories[style][id].bar_type = id;
+        category_game_data->categories[style][id].meta.id = id;
 
         // properly clean things out first
         empty_category(&category_game_data->categories[style][id]);
@@ -371,7 +379,7 @@ namespace playlister
         calculate_clear_lamps(category_game_data, style, id);
 
         // make the category appear
-        category_game_data->populated_categories[style][id] = &category_game_data->categories[style][id];
+        category_game_data->populated_categories[style][category_game_data->bar_count++] = &category_game_data->categories[style][id];
     }
 
     // state management
@@ -397,12 +405,18 @@ namespace playlister
         category_definition_patches[OVERRIDE_CATEGORY_ID]->lock_difficulties = true;
         spdlog::debug("Patching override category definition...");
 
+        // reset amount of populated bars
+        category_game_data->bar_count = 0;
+
         auto i = 0;
 
         for (auto const& playlist: playlist_data)
         {
             if (playlist.play_style != state->play_style)
                 continue;
+
+            if (i == OVERRIDE_CATEGORY_ID)
+                ++i;
 
             create_populated_category(state->play_style, i, playlist);
 
@@ -411,9 +425,6 @@ namespace playlister
             if (i >= CATEGORY_COUNT)
                 break;
         }
-
-        // update amount of populated bars
-        category_game_data->bar_count = i;
     }
 
     auto exit_playlist_mode()
@@ -430,16 +441,29 @@ namespace playlister
         spdlog::debug("Disabled {} code patches.", playlist_mode_patches.size());
     }
 
+    auto init_mselect_generic()
+    {
+        if (target_category_id != -1)
+            spdlog::debug("Resetting music select state...");
+
+        backup_created = false;   // "clean" category backup should be created once per music select init
+        target_category_id = -1;  // ensure setup_categories_hook will re-select an appropriate category
+        target_category_patch = category_definition_patch {};  // this should revert the old patch, if there was one
+
+        // restore all category definitions settings to default
+        category_definition_patches.clear();
+    };
+
     auto install_hooks()
     {
         // game context offsets
-        state = reinterpret_cast<decltype(state)>(base + OFFSET_GAME_STATE);
-        buttons = reinterpret_cast<decltype(buttons)>(base + OFFSET_BUTTON_STATE);
-        music_data = reinterpret_cast<decltype(music_data)>(base + OFFSET_MUSIC_DATA);
-        player_scores_p1 = reinterpret_cast<decltype(player_scores_p1)>(base + OFFSET_SCORES_P1);
-        player_scores_p2 = reinterpret_cast<decltype(player_scores_p2)>(base + OFFSET_SCORES_P2);
-        category_definitions = reinterpret_cast<decltype(category_definitions)>(base + OFFSET_CATEGORY_DEFS);
-        application_config = reinterpret_cast<decltype(application_config) (*) ()>(base + OFFSET_GET_APP_CFG_FN)();
+        state = reinterpret_cast<decltype(state)>(addr.GAME_STATE);
+        buttons = reinterpret_cast<decltype(buttons)>(addr.BUTTON_STATE);
+        music_data = reinterpret_cast<decltype(music_data)>(addr.MUSIC_DATA);
+        player_scores_p1 = reinterpret_cast<decltype(player_scores_p1)>(addr.SCORES_P1);
+        player_scores_p2 = reinterpret_cast<decltype(player_scores_p2)>(addr.SCORES_P2);
+        category_definitions = reinterpret_cast<decltype(category_definitions)>(addr.CATEGORY_DEFS);
+        application_config = reinterpret_cast<decltype(application_config) (*) ()>(addr.GET_APP_CFG_FN)();
 
         // stuff beyond this point relies on pointers that aren't initialized shortly after game boot
         // they become valid around the time monitor check starts, so wait for it to finish before continuing
@@ -447,8 +471,8 @@ namespace playlister
             { std::this_thread::sleep_for(1s); }
 
         // multi-level pointers, but definitely valid after monitor check
-        category_game_data = *reinterpret_cast<decltype(category_game_data)*>(base + OFFSET_CATEGORY_DATA);
-        music_select_game_data = *reinterpret_cast<decltype(music_select_game_data)*>(base + OFFSET_MSELECT_DATA);
+        category_game_data = *reinterpret_cast<decltype(category_game_data)*>(addr.CATEGORY_DATA);
+        music_select_game_data = *reinterpret_cast<decltype(music_select_game_data)*>(addr.MSELECT_DATA);
 
         // backup the category voice stuff
         for (auto i = 0; i < CATEGORY_COUNT; i++)
@@ -465,46 +489,44 @@ namespace playlister
         }
 
         // game functions
-        reload_lamps = reinterpret_cast<decltype(reload_lamps)>(base + OFFSET_RELOAD_LAMPS_FN);
-        sort_bars = reinterpret_cast<decltype(sort_bars)>(base + OFFSET_SORT_BARS_FN);
-        play_system_sound = reinterpret_cast<decltype(play_system_sound)>(base + OFFSET_PLAY_SOUND_FN);
+        reload_lamps = reinterpret_cast<decltype(reload_lamps)>(addr.RELOAD_LAMPS_FN);
+        sort_bars = reinterpret_cast<decltype(sort_bars)>(addr.SORT_BARS_FN);
+        play_system_sound = reinterpret_cast<decltype(play_system_sound)>(addr.PLAY_SOUND_FN);
 
         // code patches that are turned on and off situationally
-        playlist_mode_patches.emplace_back(base + BAR_EVENT_BADGE_PATCH, 0xE9, 0x84, 0x00, 0x00, 0x00, 0x90);
-        playlist_mode_patches.emplace_back(base + BAR_CONTEST_TEXT_PATCH, 0xE9, 0xD3, 0x01, 0x00, 0x00, 0x90);
-        playlist_mode_patches.emplace_back(base + BAR_CUSTOM_TEXT_PATCH, 0xEB, 0x18, 0x90, 0x90, 0x90, 0x90);
-        playlist_mode_patches.emplace_back(base + BAR_EVENT_LAMP_PATCH, 0xEB);
-        playlist_mode_patches.emplace_back(base + BAR_CONTEST_LAMP_PATCH, 0xEB);
-        playlist_mode_patches.emplace_back(base + BAR_BATTLE_LAMP_PATCH, 0xE9, 0x39, 0x02, 0x00, 0x00, 0x90);
-        playlist_mode_patches.emplace_back(base + RANDOM_SPLIT_LAMP_PATCH, 0xE9, 0x33, 0x02, 0x00, 0x00, 0x90);
-        playlist_mode_patches.emplace_back(base + TOURISM_CRASH_FIX_PATCH, 0xE9, 0x97, 0x00, 0x00, 0x00, 0x90);
+        playlist_mode_patches.emplace_back(addr.BAR_TOURISM_BADGE_PATCH, 0xEB);
+        playlist_mode_patches.emplace_back(addr.BAR_CONTEST_TEXT_PATCH, 0xEB);
+        playlist_mode_patches.emplace_back(addr.BAR_CUSTOM_TEXT_PATCH, 0xEB, 0x11, 0x90, 0x90, 0x90, 0x90);
+        playlist_mode_patches.emplace_back(addr.BAR_CONTEST_LAMP_PATCH, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90);
+        playlist_mode_patches.emplace_back(addr.BAR_BATTLE_LAMP_PATCH, 0x31, 0xC0);
+        playlist_mode_patches.emplace_back(addr.RANDOM_SPLIT_LAMP_PATCH, 0x31, 0xC0);
 
         //
         // called in various places but never while inside music select
         // useful place to reset things that will be set in future hooks
         //
-        music_select_init_hook = safetyhook::create_inline(base + MSELECT_INIT_HOOK, +[]
+        music_select_init_hook = safetyhook::create_inline(addr.MSELECT_INIT_HOOK, +[]
         {
-            // call the original
-            mselect = music_select_init_hook.call<CMusicSelectScene*>();
+            auto const result = music_select_init_hook.call<CMusicSelectScene*>();
+            bar_state = &result->bar_state;
 
-            if (target_category_id != -1)
-                spdlog::debug("Resetting music select state...");
+            init_mselect_generic();
+            return result;
+        });
 
-            backup_created = false;   // "clean" category backup should be created once per music select init
-            target_category_id = -1;  // ensure setup_categories_hook will re-select an appropriate category
-            target_category_patch = category_definition_patch {};  // this should revert the old patch, if there was one
+        music_select_event2_init_hook = safetyhook::create_inline(addr.MSELECT_EV2_INIT_HOOK, +[]
+        {
+            auto const result = music_select_event2_init_hook.call<CEvent2MusicSelectScene*>();
+            bar_state = &result->bar_state;
 
-            // restore all category definitions settings to default
-            category_definition_patches.clear();
-
-            return mselect;
+            init_mselect_generic();
+            return result;
         });
 
         //
         // called when opening a category
         //
-        open_category_hook = safetyhook::create_mid(base + OPEN_CATEGORY_HOOK,
+        open_category_hook = safetyhook::create_mid(addr.OPEN_CATEGORY_HOOK,
             [] (SafetyHookContext& ctx)
         {
             // if we're already in playlist mode, don't do anything
@@ -512,15 +534,15 @@ namespace playlister
             if (in_playlist_mode || !is_valid_game_type())
                 return;
 
-            // pull category pointer from stack
-            auto const category = *reinterpret_cast<category_t**>(ctx.rsp + 0x20);
+            auto const category = category_game_data->populated_categories[state->play_style][ctx.rdx];
 
             // ignore if this isn't our "fake" category
             if (category->id != target_category_id)
                 return;
 
             // prevent the folder from actually opening
-            ctx.rflags |= 0x40;
+            ctx.rax = 0;
+            ctx.rip += 5;
 
             // play the folder sound
             play_system_sound(FOLDER_OPEN_SOUND_ID);
@@ -529,23 +551,33 @@ namespace playlister
             enter_playlist_mode();
 
             // reset active bar
-            mselect->bar_state.active_bar = 0;
-            mselect->bar_state.bar_count = category_game_data->bar_count;
+            bar_state->active_bar = 0;
+            bar_state->bar_count = category_game_data->bar_count;
 
             // reload lamps
             spdlog::debug("Reloading folder lamps...");
 
             // only necessary when entering playlist mode from the fake category
             // without this, folder lamps would not be accurate until entering and exiting a category
-            reload_lamps(&mselect->bar_state);
+            reload_lamps(bar_state);
         });
 
         //
         // opens the sort menu when pressing black keys, used to exit playlist mode
         //
-        close_category_hook = safetyhook::create_mid(base + CLOSE_CATEGORY_HOOK,
+        close_category_hook = safetyhook::create_mid(addr.CLOSE_CATEGORY_HOOK,
             [] (SafetyHookContext& ctx)
         {
+            // read + call original function
+            auto static original_fn = reinterpret_cast<bool (*) (std::size_t)>(
+                /* instruction ptr */ close_category_hook.target() +
+                /* displacement */ *reinterpret_cast<const std::int32_t*>(close_category_hook.original_bytes().data() + 1) +
+                /* length */ 5
+            );
+
+            ctx.rip += 5;
+            ctx.rax = original_fn(ctx.rcx);
+
             // check if we're in playlist mode
             if (!in_playlist_mode || ctx.rax == 0 || !is_valid_game_type())
                 return;
@@ -593,18 +625,18 @@ namespace playlister
                 if (category_game_data->populated_categories[state->play_style][i]->id == target_category_id)
                 {
                     spdlog::debug("Reselected inserted category.");
-                    mselect->bar_state.active_bar = i;
+                    bar_state->active_bar = i;
                     break;
                 }
             }
 
-            mselect->bar_state.bar_count = category_game_data->bar_count;
+            bar_state->bar_count = category_game_data->bar_count;
         });
 
         //
         // gathers context for the next hook
         //
-        draw_bar_text_outer_hook = safetyhook::create_inline(base + DRAW_BAR_TEXT_HOOK_A,
+        draw_bar_text_outer_hook = safetyhook::create_inline(addr.DRAW_BAR_TEXT_HOOK_A,
            +[] (std::int32_t* category_id, int a2, int a3, float a4, unsigned int a5)
         {
             // just store the category to use in inner hook
@@ -617,7 +649,7 @@ namespace playlister
         //
         // overrides folder name text rendering
         //
-        draw_bar_text_inner_hook = safetyhook::create_inline(base + DRAW_BAR_TEXT_HOOK_B,
+        draw_bar_text_inner_hook = safetyhook::create_inline(addr.DRAW_BAR_TEXT_HOOK_B,
            +[] (int font, int x, int y, int flags, void* buffer, const char* text, float width)
         {
             if (in_playlist_mode || !is_valid_game_type())
@@ -632,7 +664,7 @@ namespace playlister
 
                 // resolve to the underlying playlist
                 auto const& category = category_game_data->categories[state->play_style][text_category_id];
-                auto const& playlist = static_cast<playlist_t*>(category.userdata);
+                auto const& playlist = static_cast<playlist_t*>(category.meta.userdata);
 
                 auto const has_texture = config.get("custom textures", false) && !playlist->bar_texture.empty();
 
@@ -649,7 +681,7 @@ namespace playlister
         //
         // resolves category id -> system sound id
         //
-        folder_open_voice_hook = safetyhook::create_mid(base + FOLDER_VOICE_OPEN_HOOK,
+        folder_open_voice_hook = safetyhook::create_mid(addr.FOLDER_VOICE_OPEN_HOOK,
             [] (SafetyHookContext& ctx)
         {
             if (!in_playlist_mode || !is_valid_game_type())
@@ -663,8 +695,8 @@ namespace playlister
             }
 
             // avoid pulling the category pointer from the stack by using the active bar instead
-            auto const& category = category_game_data->populated_categories[state->play_style][mselect->bar_state.active_bar];
-            auto const& playlist = static_cast<playlist_t*>(category->userdata);
+            auto const& category = category_game_data->populated_categories[state->play_style][bar_state->active_bar];
+            auto const& playlist = static_cast<playlist_t*>(category->meta.userdata);
 
             if (!playlist->voice.empty() && category_voices.contains(playlist->voice))
                 ctx.rdx = category_voices[playlist->voice];
@@ -673,7 +705,7 @@ namespace playlister
         //
         // updates the ticker text
         //
-        folder_set_ticker_hook = safetyhook::create_mid(base + FOLDER_TICKER_TEXT_HOOK,
+        folder_set_ticker_hook = safetyhook::create_mid(addr.FOLDER_TICKER_TEXT_HOOK,
             [] (SafetyHookContext& ctx)
         {
             if (!in_playlist_mode || !is_valid_game_type())
@@ -681,8 +713,8 @@ namespace playlister
 
             auto result = "SELECT FROM CUSTOM CATEGORY";
 
-            auto const& category = category_game_data->populated_categories[state->play_style][mselect->bar_state.active_bar];
-            auto const& playlist = static_cast<playlist_t*>(category->userdata);
+            auto const& category = category_game_data->populated_categories[state->play_style][bar_state->active_bar];
+            auto const& playlist = static_cast<playlist_t*>(category->meta.userdata);
 
             if (playlist && !playlist->ticker_text.empty())
                 result = playlist->ticker_text.c_str();
@@ -693,7 +725,7 @@ namespace playlister
         //
         // called when populating the category list
         //
-        setup_categories_hook = safetyhook::create_inline(base + SETUP_CATEGORIES_HOOK,
+        setup_categories_hook = safetyhook::create_inline(addr.SETUP_CATEGORIES_HOOK,
             +[] (CCategoryGameData* a1, int a2) -> std::int64_t
         {
             if (!is_valid_game_type()) // only run in "safe" game modes to prevent crashes
@@ -826,7 +858,7 @@ namespace playlister
         //
         // called when leaving music select
         //
-        save_category_hook = safetyhook::create_inline(base + SAVE_CATEGORY_HOOK,
+        save_category_hook = safetyhook::create_inline(addr.SAVE_CATEGORY_HOOK,
             +[] (void* a1, int a2)
         {
             last_category_id = -1;
@@ -836,6 +868,8 @@ namespace playlister
 
             if (!in_playlist_mode || !is_valid_game_type())
                 return save_category_hook.call<void*, void*, int>(a1, a2);
+
+            bar_state = nullptr;
 
             for (auto i = 0; i < CATEGORY_COUNT; ++i)
             {
@@ -850,7 +884,7 @@ namespace playlister
 
                     auto const index = category->active_bar - 1;
 
-                    last_category_id = category->bar_type;
+                    last_category_id = category->meta.id;
                     last_music_difficulty_p1 = category->bars[index].bar->p1_difficulty_original;
                     last_music_difficulty_p2 = category->bars[index].bar->p2_difficulty_original;
                     last_music_entry_ptr = category->bars[index].bar->music_entry_ptr;
@@ -866,7 +900,7 @@ namespace playlister
         // workaround for game opening the wrong category (because the ids are all the same)
         // todo: see how this works with/without cursor lock hex edit
         //
-        cursor_lock_hook = safetyhook::create_inline(base + CURSOR_LOCK_HOOK,
+        cursor_lock_hook = safetyhook::create_inline(addr.CURSOR_LOCK_HOOK,
             +[] (bar_state_t* bar_state, int a2, int a3, int a4, int a5, char a6, int a7)
         {
             // let the game handle it if we're not in playlist mode
@@ -882,7 +916,7 @@ namespace playlister
 
                 if (!category)
                     break;
-                if (category->bar_type != last_category_id)
+                if (category->meta.id != last_category_id)
                     continue;
 
                 // folder will not be respecting currently set sort mode upon returning from music select
@@ -924,6 +958,25 @@ namespace playlister
 
             return (void*) category_game_data;
         });
+
+        //
+        // called upon entering the test menu and title screen
+        //
+        reset_state_hook = safetyhook::create_inline(addr.RESET_STATE_HOOK, +[]
+        {
+            spdlog::debug("Resetting everything...");
+
+            if (in_playlist_mode)
+                exit_playlist_mode();
+
+            text_category_id = -1;
+            last_category_id = -1;
+            last_music_difficulty_p1 = -1;
+            last_music_difficulty_p2 = -1;
+            last_music_entry_ptr = nullptr;
+
+            return reset_state_hook.call<void*>();
+        });
     }
 }
 
@@ -942,6 +995,7 @@ auto unload()
         playlister::exit_playlist_mode();
 
     playlister::music_select_init_hook.reset();
+    playlister::music_select_event2_init_hook.reset();
     playlister::open_category_hook.reset();
     playlister::close_category_hook.reset();
     playlister::draw_bar_text_outer_hook.reset();
@@ -1016,6 +1070,18 @@ auto DllMain(HMODULE dll_instance, DWORD reason, LPVOID) -> BOOL
             spdlog::error("Failed to find game module.");
             return EXIT_FAILURE;
         }
+
+        // resolve offsets
+        auto offsets = resolve_offsets(playlister::base.start());
+
+        if (!offsets)
+        {
+            spdlog::error("Unsupported game version.");
+            return EXIT_FAILURE;
+        }
+
+        spdlog::info("Using addresses for game version {}...", offsets->GAME_VERSION);
+        playlister::addr = *offsets;
 
 #ifdef _DEBUG
         // force trace level messages for debug builds.
