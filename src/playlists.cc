@@ -19,6 +19,12 @@ void load_playlists(const std::filesystem::path& dir, music_data_t* music_data)
 
     spdlog::debug("Searching for playlists in directory '{}'...", dir.string());
 
+    if (!exists(dir))
+    {
+        spdlog::error("Playlist directory '{}' does not exist!", dir.string());
+        return;
+    }
+
     // Start parsing playlists from disk.
     for (auto const& it: std::filesystem::directory_iterator(dir))
     {
