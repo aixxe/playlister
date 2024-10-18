@@ -499,6 +499,7 @@ namespace playlister
         playlist_mode_patches.emplace_back(addr.BAR_CUSTOM_TEXT_PATCH, 0xEB, 0x11, 0x90, 0x90, 0x90, 0x90);
         playlist_mode_patches.emplace_back(addr.BAR_CONTEST_LAMP_PATCH, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90);
         playlist_mode_patches.emplace_back(addr.BAR_BATTLE_LAMP_PATCH, 0x31, 0xC0);
+        playlist_mode_patches.emplace_back(addr.BAR_SPLIT_LAMP_PATCH, 0x31, 0xC0);
         playlist_mode_patches.emplace_back(addr.RANDOM_SPLIT_LAMP_PATCH, 0x31, 0xC0);
 
         //

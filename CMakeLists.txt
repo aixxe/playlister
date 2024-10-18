@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(playlister3 VERSION 4.0.0.0 LANGUAGES CXX)
+project(playlister3 VERSION 4.0.1.0 LANGUAGES CXX)
 
 include(cmake/get_cpm.cmake)
 include(cmake/GetGitRevisionDescription.cmake)

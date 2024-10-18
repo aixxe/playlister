@@ -33,6 +33,7 @@ struct offsets
     std::uint8_t* BAR_TOURISM_BADGE_PATCH;
     std::uint8_t* BAR_CONTEST_LAMP_PATCH;
     std::uint8_t* BAR_BATTLE_LAMP_PATCH;
+    std::uint8_t* BAR_SPLIT_LAMP_PATCH;
     std::uint8_t* RANDOM_SPLIT_LAMP_PATCH;
 
     std::uint8_t* SCORES_P1;

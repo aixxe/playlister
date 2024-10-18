@@ -30,6 +30,7 @@ versions.push_back({
     .BAR_TOURISM_BADGE_PATCH = base + 0x05B3B81,
     .BAR_CONTEST_LAMP_PATCH  = base + 0x05B3D07,
     .BAR_BATTLE_LAMP_PATCH   = base + 0x05B3DFB,
+    .BAR_SPLIT_LAMP_PATCH    = base + 0x05B539D,
     .RANDOM_SPLIT_LAMP_PATCH = base + 0x05B713E,
 
     .SCORES_P1               = base + 0x2C3D084,
