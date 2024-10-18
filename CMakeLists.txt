@@ -7,8 +7,14 @@ include(cmake/GetGitRevisionDescription.cmake)
 
 get_git_head_revision(GIT_REFSPEC GIT_COMMIT_HASH)
 
+if (NOT GIT_REFSPEC)
+    set(GIT_REFSPEC "release")
+endif()
+
 string(REPLACE "refs/heads/" "" GIT_BRANCH_NAME ${GIT_REFSPEC})
 string(SUBSTRING ${GIT_COMMIT_HASH} 0 8 GIT_COMMIT_HASH_SHORT)
+
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 CPMAddPackage(
     NAME              spdlog
