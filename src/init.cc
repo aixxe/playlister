@@ -459,7 +459,6 @@ namespace playlister
         // game context offsets
         state = reinterpret_cast<decltype(state)>(addr.GAME_STATE);
         buttons = reinterpret_cast<decltype(buttons)>(addr.BUTTON_STATE);
-        music_data = reinterpret_cast<decltype(music_data)>(addr.MUSIC_DATA);
         player_scores_p1 = reinterpret_cast<decltype(player_scores_p1)>(addr.SCORES_P1);
         player_scores_p2 = reinterpret_cast<decltype(player_scores_p2)>(addr.SCORES_P2);
         category_definitions = reinterpret_cast<decltype(category_definitions)>(addr.CATEGORY_DEFS);
@@ -471,6 +470,7 @@ namespace playlister
             { std::this_thread::sleep_for(1s); }
 
         // multi-level pointers, but definitely valid after monitor check
+        music_data = reinterpret_cast<decltype(music_data) (*) ()>(addr.GET_MUSIC_DATA_FN) ();
         category_game_data = *reinterpret_cast<decltype(category_game_data)*>(addr.CATEGORY_DATA);
         music_select_game_data = *reinterpret_cast<decltype(music_select_game_data)*>(addr.MSELECT_DATA);
 

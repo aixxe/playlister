@@ -8,6 +8,7 @@ versions.push_back({
     .PLAY_SOUND_FN           = base + 0x04B3440,
     .RELOAD_LAMPS_FN         = base + 0x04F22C0,
     .SORT_BARS_FN            = base + 0x0725A00,
+    .GET_MUSIC_DATA_FN       = base + 0x081E170,
     .GET_APP_CFG_FN          = base + 0x0803F70,
     .CATEGORY_DEFS           = base + 0x0E8B860,
 
@@ -36,6 +37,5 @@ versions.push_back({
     .CATEGORY_DATA           = base + 0x68F9C10,
     .MSELECT_DATA            = base + 0x68F9C28,
     .GAME_STATE              = base + 0x6B1DD40,
-    .MUSIC_DATA              = base + 0x6B1EC80,
     .BUTTON_STATE            = base + 0x6FDCEFC,
 });

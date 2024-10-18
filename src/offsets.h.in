@@ -11,6 +11,7 @@ struct offsets
 	std::uint8_t* PLAY_SOUND_FN;
     std::uint8_t* RELOAD_LAMPS_FN;
     std::uint8_t* SORT_BARS_FN;
+    std::uint8_t* GET_MUSIC_DATA_FN;
     std::uint8_t* GET_APP_CFG_FN;
     std::uint8_t* CATEGORY_DEFS;
 
@@ -39,7 +40,6 @@ struct offsets
     std::uint8_t* CATEGORY_DATA;
     std::uint8_t* MSELECT_DATA;
     std::uint8_t* GAME_STATE;
-    std::uint8_t* MUSIC_DATA;
     std::uint8_t* BUTTON_STATE;
 };
 
