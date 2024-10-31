@@ -242,9 +242,9 @@ struct CMusicSelectGameData
 {
     std::uint8_t pad_0000[12]; //0x0000
 	std::int32_t last_category; //0x000C
-    std::uint8_t pad_0010[4]; //0x0010
-    std::int32_t sort_mode; //0x0014
-}; static_assert(sizeof(CMusicSelectGameData) == 0x18);
+    std::uint8_t pad_0010[20]; //0x0010
+    std::int32_t sort_mode; //0x0024
+}; static_assert(sizeof(CMusicSelectGameData) == 0x28);
 
 struct CMusicSelectScene
 {
