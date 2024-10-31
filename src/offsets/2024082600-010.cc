@@ -28,6 +28,7 @@ versions.push_back({
     .BAR_CUSTOM_TEXT_PATCH   = base + 0x05B3743,
     .BAR_CONTEST_TEXT_PATCH  = base + 0x05B3A11,
     .BAR_TOURISM_BADGE_PATCH = base + 0x05B3B81,
+    .BAR_EVENT2_LAMP_PATCH   = base + 0x05B3CCA,
     .BAR_CONTEST_LAMP_PATCH  = base + 0x05B3D07,
     .BAR_BATTLE_LAMP_PATCH   = base + 0x05B3DFB,
     .BAR_SPLIT_LAMP_PATCH    = base + 0x05B539D,

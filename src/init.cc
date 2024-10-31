@@ -501,6 +501,7 @@ namespace playlister
         playlist_mode_patches.emplace_back(addr.BAR_BATTLE_LAMP_PATCH, 0x31, 0xC0);
         playlist_mode_patches.emplace_back(addr.BAR_SPLIT_LAMP_PATCH, 0x31, 0xC0);
         playlist_mode_patches.emplace_back(addr.RANDOM_SPLIT_LAMP_PATCH, 0x31, 0xC0);
+        playlist_mode_patches.emplace_back(addr.BAR_EVENT2_LAMP_PATCH, 0xB0, 0x01, 0x90);
 
         //
         // called in various places but never while inside music select
