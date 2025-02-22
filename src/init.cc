@@ -62,9 +62,7 @@ namespace playlister
     bar_state_t* bar_state = nullptr;
     auto text_category_id = -1;
     auto last_category_id = -1;
-    auto last_music_difficulty_p1 = -1;
-    auto last_music_difficulty_p2 = -1;
-    music_entry_t* last_music_entry_ptr = nullptr;
+    auto last_category_bar_id = -1;
 
     // hooks
     auto music_select_init_hook = safetyhook::InlineHook {};
@@ -864,9 +862,7 @@ namespace playlister
             +[] (void* a1, int a2)
         {
             last_category_id = -1;
-            last_music_difficulty_p1 = -1;
-            last_music_difficulty_p2 = -1;
-            last_music_entry_ptr = nullptr;
+            last_category_bar_id = -1;
 
             if (!in_playlist_mode || !is_valid_game_type())
                 return save_category_hook.call<void*, void*, int>(a1, a2);
@@ -884,12 +880,8 @@ namespace playlister
                 {
                     spdlog::debug("Storing previous position...");
 
-                    auto const index = category->active_bar - 1;
-
                     last_category_id = category->meta.id;
-                    last_music_difficulty_p1 = category->bars[index].bar->p1_difficulty_original;
-                    last_music_difficulty_p2 = category->bars[index].bar->p2_difficulty_original;
-                    last_music_entry_ptr = category->bars[index].bar->music_entry_ptr;
+                    last_category_bar_id = category->active_bar;
 
                     break;
                 }
@@ -926,36 +918,15 @@ namespace playlister
                 spdlog::debug("Sorting folder...");
                 sort_bars(category, music_select_game_data->sort_mode, true);
 
-                spdlog::debug("Searching for '{}'...", last_music_entry_ptr->title_ascii);
+                category->is_open = true;
 
-                for (auto j = 0; j < BAR_COUNT; ++j)
-                {
-                    if (!category->bars[j].bar)
-                        break;
-                    if (category->bars[j].bar->music_entry_ptr != last_music_entry_ptr)
-                        continue;
-                    if (category->bars[j].bar->p1_difficulty_original != last_music_difficulty_p1)
-                        continue;
-                    if (category->bars[j].bar->p2_difficulty_original != last_music_difficulty_p2)
-                        continue;
+                // todo: actually test this (with and without cursor lock hex edit enabled)
+                if (config.get("cursor lock", false))
+                    category->active_bar = last_category_bar_id;
 
-                    spdlog::debug("Restored previous position successfully!");
-
-                    category->is_open = true;
-                    category->active_bar = 0;
-
-                    // todo: actually test this (with and without cursor lock hex edit enabled)
-                    if (config.get("cursor lock", false))
-                        category->active_bar = j + 1;
-
-                    // open this category folder
-                    bar_state->active_bar = i;
-                    bar_state->is_folder_open = true;
-
-                    break;
-                }
-
-                break;
+                // open this category folder
+                bar_state->active_bar = i;
+                bar_state->is_folder_open = true;
             }
 
             return (void*) category_game_data;
@@ -973,9 +944,7 @@ namespace playlister
 
             text_category_id = -1;
             last_category_id = -1;
-            last_music_difficulty_p1 = -1;
-            last_music_difficulty_p2 = -1;
-            last_music_entry_ptr = nullptr;
+            last_category_bar_id = -1;
 
             return reset_state_hook.call<void*>();
         });
