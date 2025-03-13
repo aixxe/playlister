@@ -22,7 +22,7 @@ BEGIN
       VALUE "FileDescription", "playlister"
       VALUE "FileVersion", GIT_COMMIT_HASH
       VALUE "InternalName", "playlister"
-      VALUE "LegalCopyright", "© 2024, aixxe.net"
+      VALUE "LegalCopyright", "© 2025, aixxe.net"
       VALUE "OriginalFilename", "playlister.dll"
       VALUE "ProductName", "playlister"
       VALUE "ProductVersion", RC_FILEVERSION_STRING
