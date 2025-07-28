@@ -34,9 +34,9 @@ namespace playlister
     offsets addr;
     util::library base;
     state_t* state = nullptr;
+    bool* is_dp_battle = nullptr;
     std::uint64_t* buttons = nullptr;
     music_data_t* music_data = nullptr;
-    std::uint32_t* mselect_style = nullptr;
     player_scores_t* player_scores_p1 = nullptr;
     player_scores_t* player_scores_p2 = nullptr;
     CCategoryGameData* category_game_data = nullptr;
@@ -80,6 +80,15 @@ namespace playlister
     auto reset_state_hook = safetyhook::InlineHook {};
 
     // utility
+    auto get_play_style()
+    {
+        // treat DP battle as SP
+        if (*is_dp_battle)
+            return STYLE_SP;
+
+        return state->play_style;
+    }
+
     auto is_valid_game_type()
     {
         // seems to crash in ARENA & BPL BATTLE, so don't run there
@@ -171,7 +180,7 @@ namespace playlister
         // bar count is for the current play style
         auto populated_bar_count = 0;
 
-        for (auto const& category: category_game_data->populated_categories[*mselect_style])
+        for (auto const& category: category_game_data->populated_categories[get_play_style()])
             if (category)
                 populated_bar_count++;
 
@@ -411,13 +420,13 @@ namespace playlister
 
         for (auto const& playlist: playlist_data)
         {
-            if (playlist.play_style != *mselect_style)
+            if (playlist.play_style != get_play_style())
                 continue;
 
             if (i == OVERRIDE_CATEGORY_ID)
                 ++i;
 
-            create_populated_category(*mselect_style, i, playlist);
+            create_populated_category(get_play_style(), i, playlist);
 
             i++;
 
@@ -458,7 +467,7 @@ namespace playlister
         // game context offsets
         state = reinterpret_cast<decltype(state)>(addr.GAME_STATE);
         buttons = reinterpret_cast<decltype(buttons)>(addr.BUTTON_STATE);
-        mselect_style = reinterpret_cast<decltype(mselect_style)>(addr.MSELECT_STYLE);
+        is_dp_battle = reinterpret_cast<decltype(is_dp_battle)>(addr.IS_DP_BATTLE);
         player_scores_p1 = reinterpret_cast<decltype(player_scores_p1)>(addr.SCORES_P1);
         player_scores_p2 = reinterpret_cast<decltype(player_scores_p2)>(addr.SCORES_P2);
         category_definitions = reinterpret_cast<decltype(category_definitions)>(addr.CATEGORY_DEFS);
@@ -536,7 +545,7 @@ namespace playlister
             if (in_playlist_mode || !is_valid_game_type())
                 return;
 
-            auto const category = category_game_data->populated_categories[*mselect_style][ctx.rdx];
+            auto const category = category_game_data->populated_categories[get_play_style()][ctx.rdx];
 
             // ignore if this isn't our "fake" category
             if (category->id != target_category_id)
@@ -590,7 +599,7 @@ namespace playlister
                 auto const count_p1 = bits[1] + bits[3] + bits[5];
                 auto const count_p2 = bits[8] + bits[10] + bits[12];
 
-                if (*mselect_style == STYLE_SP)
+                if (get_play_style() == STYLE_SP)
                 {
                     if (state->is_active[PLAYER_1] && count_p1 == 1) return;
                     if (state->is_active[PLAYER_2] && count_p2 == 1) return;
@@ -622,9 +631,9 @@ namespace playlister
 
             for (auto i = 0; i < CATEGORY_COUNT; ++i)
             {
-                if (category_game_data->populated_categories[*mselect_style][i] == nullptr)
+                if (category_game_data->populated_categories[get_play_style()][i] == nullptr)
                     continue;
-                if (category_game_data->populated_categories[*mselect_style][i]->id == target_category_id)
+                if (category_game_data->populated_categories[get_play_style()][i]->id == target_category_id)
                 {
                     spdlog::debug("Reselected inserted category.");
                     bar_state->active_bar = i;
@@ -665,7 +674,7 @@ namespace playlister
                 width += 20.f;
 
                 // resolve to the underlying playlist
-                auto const& category = category_game_data->categories[*mselect_style][text_category_id];
+                auto const& category = category_game_data->categories[get_play_style()][text_category_id];
                 auto const& playlist = static_cast<playlist_t*>(category.meta.userdata);
 
                 auto const has_texture = config.get("custom textures", false) && !playlist->bar_texture.empty();
@@ -697,7 +706,7 @@ namespace playlister
             }
 
             // avoid pulling the category pointer from the stack by using the active bar instead
-            auto const& category = category_game_data->populated_categories[*mselect_style][bar_state->active_bar];
+            auto const& category = category_game_data->populated_categories[get_play_style()][bar_state->active_bar];
             auto const& playlist = static_cast<playlist_t*>(category->meta.userdata);
 
             if (!playlist->voice.empty() && category_voices.contains(playlist->voice))
@@ -715,7 +724,7 @@ namespace playlister
 
             auto result = "SELECT FROM CUSTOM CATEGORY";
 
-            auto const& category = category_game_data->populated_categories[*mselect_style][bar_state->active_bar];
+            auto const& category = category_game_data->populated_categories[get_play_style()][bar_state->active_bar];
             auto const& playlist = static_cast<playlist_t*>(category->meta.userdata);
 
             if (playlist && !playlist->ticker_text.empty())
@@ -736,10 +745,10 @@ namespace playlister
             // run for the opposite style first, so we can take a backup
             if (!backup_created)
             {
-                spdlog::debug("Setting up categories for {}...", state->play_style == STYLE_SP ? "DP": "SP");
-                state->play_style = (state->play_style == STYLE_SP ? STYLE_DP: STYLE_SP);
+                spdlog::debug("Setting up initial categories for {}...", get_play_style() == STYLE_SP ? "DP": "SP");
+                state->play_style = (get_play_style() == STYLE_SP ? STYLE_DP: STYLE_SP);
                 setup_categories_hook.call(a1, a2);
-                state->play_style = (state->play_style == STYLE_SP ? STYLE_DP: STYLE_SP);
+                state->play_style = (get_play_style() == STYLE_SP ? STYLE_DP: STYLE_SP);
             }
 
             // call the original for the current play style to set up the "known good" categories
@@ -752,7 +761,7 @@ namespace playlister
             if (target_category_id == -1)
                 return result;
 
-            spdlog::debug("Setting up categories for {}...", *mselect_style == STYLE_SP ? "SP": "DP");
+            spdlog::debug("Setting up categories for {}...", get_play_style() == STYLE_SP ? "SP": "DP");
 
             for (auto i = 0; i < STYLE_COUNT; ++i)
             {
@@ -848,7 +857,7 @@ namespace playlister
 
             for (auto k = 0; k < CATEGORY_COUNT; ++k)
             {
-                if (!a1->populated_categories[*mselect_style][k])
+                if (!a1->populated_categories[get_play_style()][k])
                     break;
                 a1->bar_count++;
             }
@@ -873,7 +882,7 @@ namespace playlister
 
             for (auto i = 0; i < CATEGORY_COUNT; ++i)
             {
-                auto category = category_game_data->populated_categories[*mselect_style][i];
+                auto category = category_game_data->populated_categories[get_play_style()][i];
 
                 if (!category)
                     break;
@@ -908,7 +917,7 @@ namespace playlister
 
             for (auto i = 0; i < CATEGORY_COUNT; ++i)
             {
-                auto category = category_game_data->populated_categories[*mselect_style][i];
+                auto category = category_game_data->populated_categories[get_play_style()][i];
 
                 if (!category)
                     break;

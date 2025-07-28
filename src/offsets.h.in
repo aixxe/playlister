@@ -43,7 +43,7 @@ struct offsets
     std::uint8_t* MSELECT_DATA;
     std::uint8_t* GAME_STATE;
     std::uint8_t* BUTTON_STATE;
-    std::uint8_t* MSELECT_STYLE;
+    std::uint8_t* IS_DP_BATTLE;
 };
 
 auto inline resolve_offsets(std::uint8_t* base) -> std::optional<offsets>

@@ -40,5 +40,5 @@ versions.push_back({
     .MSELECT_DATA            = base + 0x68F9C28,
     .GAME_STATE              = base + 0x6B1DD40,
     .BUTTON_STATE            = base + 0x6FDCEFC,
-    .MSELECT_STYLE           = base + 0x68DDEA0,
+    .IS_DP_BATTLE            = base + 0x6615114,
 });
