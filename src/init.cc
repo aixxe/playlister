@@ -132,6 +132,20 @@ namespace playlister
         return -1;
     }
 
+    auto get_populated_category_count(std::uint8_t play_style, auto&& src)
+    {
+        auto count = 0;
+
+        for (auto const& category: src[play_style])
+        {
+            if (!category)
+                break;
+            count++;
+        }
+
+        return count;
+    }
+
     auto backup_categories()
     {
         spdlog::debug("Backing up original categories...");
@@ -140,22 +154,8 @@ namespace playlister
         std::memcpy(populated_categories_backup, category_game_data->populated_categories, sizeof(populated_categories_backup));
         std::memcpy(bar_meta_backup, category_game_data->bar_meta, sizeof(bar_meta_backup));
 
-        auto sp_count = 0;
-        auto dp_count = 0;
-
-        for (auto const& category: category_game_data->populated_categories[STYLE_SP])
-        {
-            if (!category)
-                break;
-            sp_count++;
-        }
-
-        for (auto const& category: category_game_data->populated_categories[STYLE_DP])
-        {
-            if (!category)
-                break;
-            dp_count++;
-        }
+        auto sp_count = get_populated_category_count(STYLE_SP, category_game_data->populated_categories);
+        auto dp_count = get_populated_category_count(STYLE_DP, category_game_data->populated_categories);
 
         spdlog::debug("Backup created successfully. (SP: {}, DP: {})", sp_count, dp_count);
 
@@ -185,6 +185,7 @@ namespace playlister
                 populated_bar_count++;
 
         spdlog::debug("Setting populated bar count to {}...", populated_bar_count);
+        bar_state->active_bar = 0;
         category_game_data->bar_count = populated_bar_count;
     }
 
@@ -437,6 +438,9 @@ namespace playlister
 
     auto exit_playlist_mode()
     {
+        if (!in_playlist_mode)
+            return;
+
         in_playlist_mode = false;
 
         // restore original song wheel
@@ -665,6 +669,17 @@ namespace playlister
         {
             if (in_playlist_mode || !is_valid_game_type())
             {
+                // resolve to the underlying playlist
+                auto const& category = category_game_data->categories[get_play_style()][text_category_id];
+                auto const& playlist = static_cast<playlist_t*>(category.meta.userdata);
+
+                // ensure validity before use
+                if (!playlist || !buffer || !text)
+                {
+                    exit_playlist_mode();
+                    return draw_bar_text_inner_hook.call(font, x, y, flags, buffer, text, width);
+                }
+
                 // different font so lowercase characters can be used
                 font = 15;
 
@@ -672,10 +687,6 @@ namespace playlister
                 x -= 12;
                 y += 2;
                 width += 20.f;
-
-                // resolve to the underlying playlist
-                auto const& category = category_game_data->categories[get_play_style()][text_category_id];
-                auto const& playlist = static_cast<playlist_t*>(category.meta.userdata);
 
                 auto const has_texture = config.get("custom textures", false) && !playlist->bar_texture.empty();
 
@@ -784,8 +795,14 @@ namespace playlister
                             exit_playlist_mode();
                         }
 
-                        // result is already accurate as this isn't the first call
-                        return result;
+                        // the backup will be invalid if we just turned DP battle off after playing a song with it on
+                        // we can confirm this by checking if the backup consists of only the custom bar we added
+                        // if this is the case, just run the backup again, since both styles should be populated now
+                        auto const backup_count = get_populated_category_count(STYLE_DP, populated_categories_backup);
+                        if (get_play_style() == STYLE_DP && backup_count == 1)
+                            backup_categories();
+
+                        return a1->bar_count;
                     }
                 }
 
